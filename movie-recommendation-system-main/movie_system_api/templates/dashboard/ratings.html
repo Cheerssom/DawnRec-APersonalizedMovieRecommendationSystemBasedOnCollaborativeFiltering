@@ -1,0 +1,578 @@
+{% extends "layout.html" %}
+
+{% block title %}评分管理 - 电影信息系统{% endblock %}
+
+{% block extra_css %}
+<link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+<style>
+/* 棕色系变量 */
+:root {
+    --primary-brown: #8B7355;
+    --dark-brown: #5D4037;
+    --light-brown: #D7CCC8;
+    --medium-brown: #A1887F;
+    --brown-gradient: linear-gradient(135deg, #8B7355 0%, #5D4037 100%);
+}
+
+/* 评分记录卡片容器 */
+#ratingsListCard {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg,
+        rgba(251, 248, 243, 0.95) 0%,
+        rgba(245, 241, 235, 0.95) 100%) !important;
+    border: 1px solid rgba(139, 115, 85, 0.2) !important;
+    border-radius: 15px !important;
+    box-shadow: 0 4px 12px rgba(139, 115, 85, 0.1);
+}
+
+/* 使用伪元素添加背景图并单独控制透明度 */
+#ratingsListCard::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('{{ url_for("static", filename="images/stats-ratings.jpg") }}');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.2; /* 单独控制背景图透明度 */
+    z-index: 0;
+}
+
+/* 确保卡片内容在背景之上 */
+#ratingsListCard .card-header,
+#ratingsListCard .card-body {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+}
+
+/* 评分记录卡片头部 - 棕色系 */
+.modern-card .card-header {
+    background: linear-gradient(135deg,
+        rgba(139, 115, 85, 0.1) 0%,
+        rgba(105, 105, 105, 0.05) 100%) !important;
+    border-bottom: 1px solid rgba(139, 115, 85, 0.15) !important;
+    padding: 1rem 1.5rem;
+}
+
+.modern-card .card-title {
+    color: #5D4037 !important; /* 深棕色 */
+    font-weight: 600;
+    margin: 0;
+}
+
+/* 表格表头 - 棕色系 */
+.modern-table thead tr {
+    background: linear-gradient(135deg, #8B7355 0%, #5D4037 100%) !important;
+}
+
+.modern-table thead tr th {
+    color: white !important;
+    border-bottom: 2px solid rgba(93, 64, 55, 0.8) !important;
+    font-weight: 600;
+    text-align: center;
+    padding: 16px 12px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    position: relative;
+    border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+/* 移除最后一个表头的右边框 */
+.modern-table thead tr th:last-child {
+    border-right: none;
+}
+
+/* 添加光泽效果 */
+.modern-table thead tr th::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+        transparent,
+        rgba(255,255,255,0.15),
+        transparent);
+    transition: left 0.5s;
+}
+
+.modern-table thead tr th:hover::after {
+    left: 100%;
+}
+
+/* 徽章样式 */
+#totalCount {
+    background: linear-gradient(135deg, #8B7355 0%, #5D4037 100%) !important;
+    color: white !important;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 20px;
+}
+
+/* 星级评分为棕色 */
+.rating-stars {
+    color: var(--primary-brown);
+    font-size: 16px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* 表格整体边框与棕色协调 */
+.modern-table {
+    border: 1px solid rgba(139, 115, 85, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* 搜索卡片样式保持不变 */
+.modern-card {
+    background: linear-gradient(135deg,
+        rgba(251, 248, 243, 0.95) 0%,
+        rgba(245, 241, 235, 0.95) 100%) !important;
+    border: 1px solid rgba(139, 115, 85, 0.2) !important;
+    border-radius: 15px !important;
+    box-shadow: 0 4px 12px rgba(139, 115, 85, 0.1);
+}
+
+/* 分页棕色系适配 */
+#ratingsListCard .pagination {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 20px;
+    margin: 0;
+    border-top: 1px solid rgba(139, 115, 85, 0.1);
+    border-radius: 0 0 15px 15px;
+}
+
+.pagination .page-link {
+    color: var(--primary-brown);
+    border: 1px solid var(--light-brown);
+    margin: 0 3px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.pagination .page-item.active .page-link {
+    background: linear-gradient(135deg, var(--primary-brown) 0%, var(--dark-brown) 100%);
+    border-color: var(--primary-brown);
+    color: white;
+}
+
+.pagination .page-link:hover {
+    background-color: var(--light-brown);
+    border-color: var(--primary-brown);
+    color: var(--dark-brown);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3"><i class="fas fa-star me-2"></i>评分管理</h1>
+</div>
+
+<!-- 搜索和筛选 -->
+<div class="modern-card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fw-bold">搜索评分</label>
+                <div class="modern-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="form-control" id="searchInput" placeholder="搜索电影名称、用户...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">评分等级</label>
+                <select class="form-select modern-select" id="scoreFilter">
+                    <option value="">全部评分</option>
+                    <option value="1">1星</option>
+                    <option value="2">2星</option>
+                    <option value="3">3星</option>
+                    <option value="4">4星</option>
+                    <option value="5">5星</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">评分日期</label>
+                <input type="date" class="form-control modern-input" id="dateFilter">
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-secondary w-100 modern-btn" id="resetFilters">
+                    <i class="fas fa-redo me-1"></i> 重置
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 评分列表 -->
+<div class="modern-card" id="ratingsListCard">
+    <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>评分记录</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover modern-table" id="ratingsTable">
+                <thead>
+                    <tr>
+                        <th width="60">ID</th>
+                        <th>用户信息</th>
+                        <th>电影信息</th>
+                        <th width="120">评分</th>
+                        <th width="180">评分时间</th>
+                        <th width="120">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="ratingsTableBody">
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <div class="loading-modern"></div>
+                            <p class="mt-3 text-muted">加载评分数据...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 分页 -->
+        <nav aria-label="评分分页" class="mt-0">
+            <ul class="pagination justify-content-center mb-0" id="pagination">
+                <!-- 分页将通过JavaScript动态生成 -->
+            </ul>
+        </nav>
+    </div>
+</div>
+
+<!-- 编辑评分模态框 -->
+<div class="modal fade" id="editRatingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content modern-card">
+            <div class="modal-header bg-transparent border-0">
+                <h5 class="modal-title"><i class="fas fa-star me-2"></i>编辑评分</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editRatingForm">
+                    <input type="hidden" id="edit_rating_id" name="rating_id">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">用户</label>
+                        <p class="form-control-plaintext modern-text" id="edit_username_display"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">电影</label>
+                        <p class="form-control-plaintext modern-text" id="edit_movie_title_display"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_score" class="form-label fw-bold">评分</label>
+                        <select class="form-select modern-select" id="edit_score" name="score" required>
+                            <option value="1">1星</option>
+                            <option value="2">2星</option>
+                            <option value="3">3星</option>
+                            <option value="4">4星</option>
+                            <option value="5">5星</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-transparent border-0">
+                <button type="button" class="btn btn-outline-secondary modern-btn" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn gradient-btn" id="updateRatingBtn">
+                    <i class="fas fa-save me-1"></i> 更新评分
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 添加必要的变量定义
+    const itemsPerPage = 10;
+    let currentPage = 1;
+
+    // 防抖函数
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // 显示提示信息
+    function showAlert(message, type = 'info') {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        const container = document.querySelector('.container-fluid');
+        container.insertBefore(alertDiv, container.firstChild);
+
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.parentNode.removeChild(alertDiv);
+            }
+        }, 5000);
+    }
+
+    // 生成星级评分
+    function generateStarRating(score) {
+        if (!score) return '暂无评分';
+
+        let stars = '';
+        for (let i = 1; i <= 5; i++) {
+            if (i <= score) {
+                stars += '<i class="fas fa-star"></i>';
+            } else {
+                stars += '<i class="far fa-star"></i>';
+            }
+        }
+        return stars;
+    }
+
+    // 格式化时间
+    function formatTime(timestamp) {
+        if (!timestamp) return '-';
+        const date = new Date(timestamp);
+        return date.toLocaleString('zh-CN');
+    }
+
+    // 渲染分页
+    function renderPagination(totalItems, page, type) {
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        const pagination = document.getElementById('pagination');
+
+        if (totalPages <= 1) {
+            pagination.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+
+        // 上一页
+        if (page > 1) {
+            html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="changePage(${page - 1}, '${type}')">上一页</a></li>`;
+        }
+
+        // 动态计算要显示的页码范围 (显示当前页的前后2页)
+        let startPage = Math.max(1, page - 2);
+        let endPage = Math.min(totalPages, page + 2);
+
+        // 如果起始页不是第一页，则显示第一页和省略号
+        if (startPage > 1) {
+            html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="changePage(1, '${type}')">1</a></li>`;
+            if (startPage > 2) {
+                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+        }
+
+        // 页码
+        for (let i = startPage; i <= endPage; i++) {
+            if (i === page) {
+                html += `<li class="page-item active"><a class="page-link" href="javascript:void(0)">${i}</a></li>`;
+            } else {
+                html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="changePage(${i}, '${type}')">${i}</a></li>`;
+            }
+        }
+
+        // 如果结束页不是最后一页，则显示省略号和最后一页
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+            html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="changePage(${totalPages}, '${type}')">${totalPages}</a></li>`;
+        }
+
+        // 下一页
+        if (page < totalPages) {
+            html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="changePage(${page + 1}, '${type}')">下一页</a></li>`;
+        }
+
+        pagination.innerHTML = html;
+    }
+
+    // 切换页面
+    function changePage(page, type) {
+        currentPage = page;
+        if (type === 'ratings') {
+            loadRatings(page);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadRatings();
+
+        // 搜索和筛选
+        document.getElementById('searchInput').addEventListener('input', debounce(loadRatings, 500));
+        document.getElementById('scoreFilter').addEventListener('change', loadRatings);
+        document.getElementById('dateFilter').addEventListener('change', loadRatings);
+        document.getElementById('resetFilters').addEventListener('click', resetFilters);
+
+        // 更新评分
+        document.getElementById('updateRatingBtn').addEventListener('click', updateRating);
+    });
+
+    function resetFilters() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('scoreFilter').value = '';
+        document.getElementById('dateFilter').value = '';
+        loadRatings();
+    }
+
+    // 加载评分列表
+    async function loadRatings(page = 1) {
+        try {
+            const search = document.getElementById('searchInput').value;
+            const score = document.getElementById('scoreFilter').value;
+            const date = document.getElementById('dateFilter').value;
+
+            let url = `/api/ratings?page=${page}&limit=${itemsPerPage}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            if (score) url += `&score=${score}`;
+            if (date) url += `&date=${date}`;
+
+            console.log('正在加载评分数据，URL:', url);
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            console.log('评分数据响应:', data);
+
+            const tbody = document.getElementById('ratingsTableBody');
+
+            if (response.ok && data.ratings && data.ratings.length > 0) {
+                tbody.innerHTML = data.ratings.map(rating => `
+                    <tr>
+                        <td>${rating.rating_id}</td>
+                        <td>${rating.username}${rating.nickname ? ` (${rating.nickname})` : ''}</td>
+                        <td>${rating.movie_title}</td>
+                        <td>
+                            <div class="rating-stars">
+                                ${generateStarRating(rating.score)}
+                            </div>
+                            <small class="text-muted">${rating.score}星</small>
+                        </td>
+                        <td>${formatTime(rating.rating_time)}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="editRating(${rating.rating_id})" title="编辑">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="deleteRating(${rating.rating_id})" title="删除">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+
+                renderPagination(data.total, page, 'ratings');
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            <i class="fas fa-star fa-2x mb-3 d-block"></i>
+                            ${data.ratings && data.ratings.length === 0 ? '暂无评分数据' : '加载评分数据失败'}
+                        </td>
+                    </tr>
+                `;
+            }
+        } catch (error) {
+            console.error('加载评分失败:', error);
+            showAlert('加载评分数据失败: ' + error.message, 'danger');
+        }
+    }
+
+    // 编辑评分
+    async function editRating(ratingId) {
+        try {
+            const response = await fetch(`/api/ratings/${ratingId}`);
+            const data = await response.json();
+
+            if (response.ok) {
+                document.getElementById('edit_rating_id').value = data.rating_id;
+                document.getElementById('edit_username_display').textContent =
+                    `${data.username}${data.nickname ? ` (${data.nickname})` : ''}`;
+                document.getElementById('edit_movie_title_display').textContent = data.movie_title;
+                document.getElementById('edit_score').value = data.score;
+
+                // 显示编辑模态框
+                let modal = bootstrap.Modal.getInstance(document.getElementById('editRatingModal'));
+                if (!modal) {
+                    modal = new bootstrap.Modal(document.getElementById('editRatingModal'));
+                }
+                modal.show();
+            } else {
+                showAlert('加载评分信息失败', 'danger');
+            }
+        } catch (error) {
+            console.error('加载评分信息失败:', error);
+            showAlert('加载评分信息失败: ' + error.message, 'danger');
+        }
+    }
+
+    // 更新评分
+    async function updateRating() {
+        const ratingId = document.getElementById('edit_rating_id').value;
+        const score = document.getElementById('edit_score').value;
+
+        try {
+            const response = await fetch(`/api/ratings/${ratingId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ score: parseInt(score) })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showAlert('评分更新成功', 'success');
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editRatingModal'));
+                modal.hide();
+                loadRatings();
+            } else {
+                showAlert(result.error || result.message || '更新失败', 'danger');
+            }
+        } catch (error) {
+            console.error('更新评分失败:', error);
+            showAlert('更新失败: ' + error.message, 'danger');
+        }
+    }
+
+    // 删除评分
+    async function deleteRating(ratingId) {
+        if (confirm('确定要删除这个评分记录吗？此操作不可撤销。')) {
+            try {
+                const response = await fetch(`/api/ratings/${ratingId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showAlert('评分删除成功', 'success');
+                    loadRatings();
+                } else {
+                    showAlert('删除失败', 'danger');
+                }
+            } catch (error) {
+                console.error('删除评分失败:', error);
+                showAlert('删除失败: ' + error.message, 'danger');
+            }
+        }
+    }
+</script>
+{% endblock %}
